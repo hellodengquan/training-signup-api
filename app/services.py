@@ -121,18 +121,18 @@ def cancel_waitlist_entry(db: Session, course_id: int, waitlist_id: int) -> bool
     return True
 
 
-def get_waitlist_metrics(db: Session, course_id: int) -> Optional[dict]:
+def get_waitlist_metrics(db: Session, course_id: int, days: int = 7) -> Optional[dict]:
     course = get_course(db, course_id)
     if not course:
         return None
 
     current_waitlist_length = _get_waiting_waitlist_count(db, course_id)
 
-    seven_days_ago = datetime.utcnow() - timedelta(days=7)
+    days_ago = datetime.utcnow() - timedelta(days=days)
     promoted_entries = db.query(models.WaitlistEntry).filter(
         models.WaitlistEntry.course_id == course_id,
         models.WaitlistEntry.status == "promoted",
-        models.WaitlistEntry.promoted_at >= seven_days_ago
+        models.WaitlistEntry.promoted_at >= days_ago
     ).all()
 
     avg_wait_seconds = 0.0

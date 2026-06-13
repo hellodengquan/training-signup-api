@@ -64,8 +64,10 @@ def cancel_waitlist(course_id: int, waitlist_id: int, db: Session = Depends(get_
 
 
 @router.get("/{course_id}/waitlist-metrics", response_model=schemas.WaitlistMetrics)
-def get_waitlist_metrics(course_id: int, db: Session = Depends(get_db)):
-    metrics = services.get_waitlist_metrics(db, course_id)
+def get_waitlist_metrics(course_id: int, days: int = 7, db: Session = Depends(get_db)):
+    if days > 90:
+        raise HTTPException(status_code=400, detail="Maximum allowed days is 90")
+    metrics = services.get_waitlist_metrics(db, course_id, days=days)
     if metrics is None:
         raise HTTPException(status_code=404, detail="Course not found")
     return metrics

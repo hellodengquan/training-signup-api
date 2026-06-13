@@ -114,3 +114,85 @@ def test_waitlist_metrics_nonexistent_course_returns_404(client: TestClient, db_
 
     assert response.status_code == 404
     assert "not found" in response.json()["detail"].lower()
+
+
+def test_waitlist_metrics_default_days_is_7(client: TestClient, db_session: Session):
+    course = create_test_course(db_session, capacity=3, waitlist_capacity=10)
+    course_id = course.id
+    now = datetime.utcnow()
+
+    promoted_recent = models.WaitlistEntry(
+        course_id=course_id, user_name="PR", user_email="pr@test.com",
+        position=0, status="promoted",
+        joined_at=now - timedelta(days=5),
+        promoted_at=now - timedelta(days=3)
+    )
+    promoted_old = models.WaitlistEntry(
+        course_id=course_id, user_name="PO", user_email="po@test.com",
+        position=0, status="promoted",
+        joined_at=now - timedelta(days=20),
+        promoted_at=now - timedelta(days=10)
+    )
+
+    db_session.add_all([promoted_recent, promoted_old])
+    db_session.commit()
+
+    response_default = client.get(f"/courses/{course_id}/waitlist-metrics")
+    response_explicit_7 = client.get(f"/courses/{course_id}/waitlist-metrics?days=7")
+
+    assert response_default.status_code == 200
+    assert response_explicit_7.status_code == 200
+
+    data_default = response_default.json()
+    data_7 = response_explicit_7.json()
+
+    expected_avg = 2 * 24 * 3600
+    assert data_default["avg_promotion_wait_seconds"] == pytest.approx(expected_avg, rel=1e-3)
+    assert data_7["avg_promotion_wait_seconds"] == pytest.approx(expected_avg, rel=1e-3)
+    assert data_default == data_7
+
+
+def test_waitlist_metrics_days_30_returns_30_day_avg(client: TestClient, db_session: Session):
+    course = create_test_course(db_session, capacity=3, waitlist_capacity=10)
+    course_id = course.id
+    now = datetime.utcnow()
+
+    promoted_5d = models.WaitlistEntry(
+        course_id=course_id, user_name="P5", user_email="p5@test.com",
+        position=0, status="promoted",
+        joined_at=now - timedelta(days=5),
+        promoted_at=now - timedelta(days=3)
+    )
+    promoted_15d = models.WaitlistEntry(
+        course_id=course_id, user_name="P15", user_email="p15@test.com",
+        position=0, status="promoted",
+        joined_at=now - timedelta(days=20),
+        promoted_at=now - timedelta(days=15)
+    )
+    promoted_60d = models.WaitlistEntry(
+        course_id=course_id, user_name="P60", user_email="p60@test.com",
+        position=0, status="promoted",
+        joined_at=now - timedelta(days=80),
+        promoted_at=now - timedelta(days=60)
+    )
+
+    db_session.add_all([promoted_5d, promoted_15d, promoted_60d])
+    db_session.commit()
+
+    response = client.get(f"/courses/{course_id}/waitlist-metrics?days=30")
+
+    assert response.status_code == 200
+    data = response.json()
+
+    avg_30d = (2 * 24 * 3600 + 5 * 24 * 3600) / 2
+    assert data["avg_promotion_wait_seconds"] == pytest.approx(avg_30d, rel=1e-3)
+
+
+def test_waitlist_metrics_days_120_returns_400(client: TestClient, db_session: Session):
+    course = create_test_course(db_session, capacity=5)
+
+    response = client.get(f"/courses/{course.id}/waitlist-metrics?days=120")
+
+    assert response.status_code == 400
+    assert "90" in response.json()["detail"]
+    assert "maximum" in response.json()["detail"].lower()
