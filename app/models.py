@@ -44,6 +44,8 @@ class WaitlistEntry(Base):
     user_email = Column(String(200), nullable=False)
     user_phone = Column(String(20), nullable=True)
     position = Column(Integer, nullable=False)
+    status = Column(String(20), default="waiting")
     joined_at = Column(DateTime, server_default=func.now())
+    promoted_at = Column(DateTime, nullable=True)
 
     course = relationship("Course", back_populates="waitlist")

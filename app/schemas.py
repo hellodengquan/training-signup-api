@@ -82,3 +82,10 @@ class EnrollmentResult(BaseModel):
     message: str
     status: Optional[str] = None
     position: Optional[int] = None
+
+
+class WaitlistMetrics(BaseModel):
+    course_id: int
+    current_waitlist_length: int
+    avg_promotion_wait_seconds: float
+    cancelled_waitlist_count: int
